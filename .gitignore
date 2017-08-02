@@ -38,3 +38,6 @@ hs_err_pid*
 #Vertx.io
 .vertx
 vertx-start-project.iml
+
+#Hsqldb folder
+db*

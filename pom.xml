@@ -127,9 +127,9 @@
         <configuration>
           <mainClass>io.vertx.core.Launcher</mainClass>
           <arguments>
-            <argument>-Dhsqldb.reconfig_logging=false</argument>
             <argument>run</argument>
             <argument>${main.verticle}</argument>
+            <argument>-Dhsqldb.reconfig_logging=false</argument>
           </arguments>
         </configuration>
       </plugin>
