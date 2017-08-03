@@ -1,5 +1,6 @@
 package io.cesarcneto.vertx.guide.wiki;
 
+import io.cesarcneto.vertx.guide.wiki.database.WikiDatabaseVerticle;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.DeploymentOptions;
 import io.vertx.core.Future;
@@ -19,7 +20,7 @@ public class MainVerticle extends AbstractVerticle {
 
       Future<String> httpVerticleDeployment = Future.future();
       vertx.deployVerticle(
-        "io.cesarcneto.vertx.guide.wiki.HttpServerVerticle",
+        "io.cesarcneto.vertx.guide.wiki.http.HttpServerVerticle",
         new DeploymentOptions().setInstances(2),
         httpVerticleDeployment.completer());
 
