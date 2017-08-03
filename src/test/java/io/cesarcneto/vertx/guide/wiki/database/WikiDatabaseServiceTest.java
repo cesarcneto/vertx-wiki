@@ -71,5 +71,4 @@ public class WikiDatabaseServiceTest {
     }));
     async.awaitSuccess(5000);
   }
-
 }
