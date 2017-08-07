@@ -63,6 +63,7 @@ public class WikiDatabaseVerticle extends AbstractVerticle {
     HashMap<SqlQuery, String> sqlQueries = new HashMap<>();
     sqlQueries.put(SqlQuery.CREATE_PAGES_TABLE, queriesProps.getProperty("create-pages-table"));
     sqlQueries.put(SqlQuery.ALL_PAGES, queriesProps.getProperty("all-pages"));
+    sqlQueries.put(SqlQuery.ALL_PAGES_DATA, queriesProps.getProperty("all-pages-data"));
     sqlQueries.put(SqlQuery.GET_PAGE, queriesProps.getProperty("get-page"));
     sqlQueries.put(SqlQuery.CREATE_PAGE, queriesProps.getProperty("create-page"));
     sqlQueries.put(SqlQuery.SAVE_PAGE, queriesProps.getProperty("save-page"));
