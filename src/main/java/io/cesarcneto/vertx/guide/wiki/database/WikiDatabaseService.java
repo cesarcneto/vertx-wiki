@@ -33,6 +33,9 @@ public interface WikiDatabaseService {
   WikiDatabaseService fetchAllPagesData(Handler<AsyncResult<List<JsonObject>>> resultHandler);
 
   @Fluent
+  WikiDatabaseService fetchPageById(int id, Handler<AsyncResult<JsonObject>> resultHandler);
+
+  @Fluent
   WikiDatabaseService fetchPage(String name, Handler<AsyncResult<JsonObject>> resultHandler);
 
   @Fluent
