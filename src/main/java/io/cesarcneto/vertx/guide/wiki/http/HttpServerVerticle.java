@@ -8,14 +8,21 @@ import io.vertx.core.Future;
 import io.vertx.core.Handler;
 import io.vertx.core.eventbus.DeliveryOptions;
 import io.vertx.core.http.HttpServer;
+import io.vertx.core.http.HttpServerOptions;
 import io.vertx.core.json.JsonObject;
+import io.vertx.core.net.JksOptions;
+import io.vertx.ext.auth.AuthProvider;
+import io.vertx.ext.auth.shiro.ShiroAuth;
+import io.vertx.ext.auth.shiro.ShiroAuthOptions;
+import io.vertx.ext.auth.shiro.ShiroAuthRealmType;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.client.HttpResponse;
 import io.vertx.ext.web.client.WebClient;
 import io.vertx.ext.web.client.WebClientOptions;
 import io.vertx.ext.web.codec.BodyCodec;
-import io.vertx.ext.web.handler.BodyHandler;
+import io.vertx.ext.web.handler.*;
+import io.vertx.ext.web.sstore.LocalSessionStore;
 import io.vertx.ext.web.templ.FreeMarkerTemplateEngine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,11 +61,30 @@ public class HttpServerVerticle extends AbstractVerticle {
 
     webClient = WebClient.create(vertx, new WebClientOptions().setSsl(true).setUserAgent("vert-x3"));
 
-    HttpServer server = vertx.createHttpServer();
-    // (...)
-    // end::db-consume[]
+    HttpServer server = vertx.createHttpServer(new HttpServerOptions()
+      .setSsl(true)
+      .setKeyStoreOptions(new JksOptions()
+        .setPath("server-keystore.jks")
+        .setPassword("secret")
+      )
+    );
+
+    AuthProvider auth = ShiroAuth.create(vertx, new ShiroAuthOptions()
+      .setType(ShiroAuthRealmType.PROPERTIES)
+      .setConfig(new JsonObject()
+        .put("properties_path", "classpath:wiki-users.properties")));
 
     Router router = Router.router(vertx);
+
+    router.route().handler(CookieHandler.create());
+    router.route().handler(BodyHandler.create());
+    router.route().handler(SessionHandler.create(LocalSessionStore.create(vertx)));
+    router.route().handler(UserSessionHandler.create(auth));
+
+    AuthHandler authHandler = RedirectAuthHandler.create(auth, "/login");
+    router.route("/").handler(authHandler);
+    router.route("/wiki/*").handler(authHandler);
+    router.route("/action/*").handler(authHandler);
 
     router.get("/").handler(this::indexHandler);
     router.get("/wiki/:page").handler(this::pageRenderingHandler);
@@ -79,6 +105,17 @@ public class HttpServerVerticle extends AbstractVerticle {
     apiRouter.delete("/pages/:id").handler(this::apiDeletePage);
     router.mountSubRouter("/api", apiRouter);
 
+    router.get("/login").handler(this::loginHandler);
+    router.post("/login-auth").handler(FormLoginHandler.create(auth));
+
+    router.get("/logout").handler(context -> {
+      context.clearUser();
+      context.response()
+        .setStatusCode(302)
+        .putHeader("Location", "/")
+        .end();
+    });
+
     int portNumber = config().getInteger(CONFIG_HTTP_SERVER_PORT, 8080);
     server
       .requestHandler(router::accept)
@@ -91,6 +128,18 @@ public class HttpServerVerticle extends AbstractVerticle {
           startFuture.fail(ar.cause());
         }
       });
+  }
+
+  private void loginHandler(RoutingContext context) {
+    context.put("title", "Login");
+    templateEngine.render(context, "templates", "login.ftl", ar -> {
+      if (ar.succeeded()) {
+        context.response().putHeader("Content-Type", "text/html");
+        context.response().end(ar.result());
+      } else {
+        context.fail(ar.cause());
+      }
+    });
   }
 
   private void apiRoot(RoutingContext context) {
@@ -273,21 +322,26 @@ public class HttpServerVerticle extends AbstractVerticle {
 
 
   private void indexHandler(RoutingContext context) {
-    dbService.fetchAllPages(reply -> {
-      if (reply.succeeded()) {
-        context.put("title", "Wiki home");
-        context.put("pages", reply.result().getList());
-        templateEngine.render(context, "templates", "/index.ftl", ar -> {
-          if (ar.succeeded()) {
-            context.response().putHeader("Content-Type", "text/html");
-            context.response().end(ar.result());
-          } else {
-            context.fail(ar.cause());
-          }
-        });
-      } else {
-        context.fail(reply.cause());
-      }
+    context.user().isAuthorised("create", res -> {
+      boolean canCreatePage = res.succeeded() && res.result();
+      dbService.fetchAllPages(reply -> {
+        if (reply.succeeded()) {
+          context.put("title", "Wiki home");
+          context.put("pages", reply.result().getList());
+          context.put("canCreatePage", canCreatePage);
+          context.put("username", context.user().principal().getString("username"));
+          templateEngine.render(context, "templates", "/index.ftl", ar -> {
+            if (ar.succeeded()) {
+              context.response().putHeader("Content-Type", "text/html");
+              context.response().end(ar.result());
+            } else {
+              context.fail(ar.cause());
+            }
+          });
+        } else {
+          context.fail(reply.cause());
+        }
+      });
     });
   }
 
@@ -354,13 +408,22 @@ public class HttpServerVerticle extends AbstractVerticle {
   }
 
   private void pageDeletionHandler(RoutingContext context) {
-    dbService.deletePage(Integer.valueOf(context.request().getParam("id")), reply -> {
-      if (reply.succeeded()) {
-        context.response().setStatusCode(303);
-        context.response().putHeader("Location", "/");
-        context.response().end();
+    context.user().isAuthorised("delete", res -> {
+      if (res.succeeded() && res.result()) {
+
+        // Original code:
+        dbService.deletePage(Integer.valueOf(context.request().getParam("id")), reply -> {
+          if (reply.succeeded()) {
+            context.response().setStatusCode(303);
+            context.response().putHeader("Location", "/");
+            context.response().end();
+          } else {
+            context.fail(reply.cause());
+          }
+        });
+
       } else {
-        context.fail(reply.cause());
+        context.response().setStatusCode(403).end();
       }
     });
   }
