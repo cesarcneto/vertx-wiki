@@ -7,6 +7,7 @@ import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
+import io.vertx.core.net.JksOptions;
 import io.vertx.ext.unit.Async;
 import io.vertx.ext.unit.TestContext;
 import io.vertx.ext.unit.junit.VertxUnitRunner;
@@ -44,7 +45,13 @@ public class HttpVerticleApiTest {
 
     webClient = WebClient.create(vertx, new WebClientOptions()
       .setDefaultHost("localhost")
-      .setDefaultPort(8080));
+      .setDefaultPort(8080)
+      .setSsl(true)
+      .setTrustOptions(new JksOptions()
+        .setPath("server-keystore.jks")
+        .setPassword("secret")
+      )
+    );
   }
 
   @After
